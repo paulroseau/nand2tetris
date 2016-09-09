@@ -13,5 +13,16 @@ CHIP FullAdder {
         carry;   // Left bit of a + b + c
 
     PARTS:
-    // Put you code here:
+    // Implem #1
+    // Xor(a = a, b = b, out = sum0);
+    // Not(in = sum0, out = sum1);
+    // Mux(a = sum0, b = sum1, sel = c, out = sum);
+    // And(a = a, b = b, out = carry0);
+    // Or(a = a, b = b, out = carry1);
+    // Mux(a = carry0, b = carry1, sel = c, out = carry);
+
+    // Implem #2
+    HalfAdder(a = a, b = b, sum = sumTemp, carry = carry0);
+    HalfAdder(a = sumTemp, b = c, sum = sum, carry = carry1);
+    Or(a = carry0, b = carry1, out = carry);
 }
