@@ -61,8 +61,12 @@ overall computer architecture, we will map the screen memory at some address in
 the RAM, let's say 123, and this will be taken as an input by the assembler as
 well. Same thing for the keyboard...
 
-I believe that all what a driver does is expose the reading and writing of bits
+I think that all what a driver does is expose the reading and writing of bits
 in this section at a little higher level, as functions that implements some API
 given by the OS/kernel. I believe that the machine language code for these
 functions are to be put somewhere, and the driver copies paste this machine
 language code at the right spots.
+
+# Project 5 :
+
+No particular remarks or questions.
