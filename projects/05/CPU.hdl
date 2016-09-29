@@ -39,5 +39,101 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    
+    /**
+     * A register
+     *
+     * if (isAInstruction) 
+     *   load(instruction) in A
+     * else if (d1 == 1) 
+     *   load(outM) in A
+     *
+     * Note that : 
+     * - instruction[15] == 0 means we have an A-instruction
+     * - instruction[15] == 1 means we have a C-instruction
+     * - d1 == 1 means result of C-instruction should go to A
+     * - d1 corresponds to instruction[5] when instruction is a C-instruction
+     */
+    Not(in = instruction[15], out = isAInstruction);
+    Mux16(a = outM0, b = instruction, sel = isAInstruction, out = inA);
+    And(a = instruction[15], b = instruction[5], out = writeOutMToA);
+    Or(a = isAInstruction, b = writeOutMToA, out = loadA);
+    ARegister(in = inA, load = loadA, out = outA, out[0..14] = addressM);
+
+    /**
+     * D register
+     *
+     * if (isCInstruction && d2 == 1) 
+     *   load(outM) in D 
+     *
+     * Note that :
+     * - instruction[15] == 1 means we have a C-instruction
+     * - d2 corresponds to instruction[4] when instruction is a C-instruction
+     */
+    And(a = instruction[15], b = instruction[4], out = loadD);
+    DRegister(in = outM0, load = loadD, out = outD); 
+
+    /**
+    * Write M
+    * 
+    * if (isCInstruction && d3 == 1) 
+    *   load(outM) in M 
+    *
+    * Note that :
+    * - d3 corresponds to instruction[3] when instruction is a C-instruction
+    */
+    And(a = instruction[15], b = instruction[3], out = writeM);
+
+    /** 
+     * PC
+     * 
+     * if (isCInstruction && (
+     *    (output < 0 && j1 == 1) || (output == 0 && j2 == 1) || (output > 0 && j3 == 1)
+     *    ))
+     *   load(A) in PC
+     * else
+     *   increment PC
+     * 
+     * Note that :
+     * - instruction[15] == 1 means we have a C-instruction
+     * - j1 corresponds to instruction[2] when instruction is a C-instruction
+     * - j2 corresponds to instruction[1] when instruction is a C-instruction
+     * - j3 corresponds to instruction[0] when instruction is a C-instruction
+     */
+    And(a = outMIsNeg, b = instruction[2], out = doJmpNeg);
+    And(a = outMIsZero, b = instruction[1], out = doJmpZero);
+    Or(a = outMIsNeg, b = outMIsZero, out = outMIsNegOrZero);
+    Not(in = outMIsNegOrZero, out = outMIsPos);
+    And(a = outMIsPos, b = instruction[0], out = doJmpPos);
+    Or(a = doJmpNeg, b = doJmpZero, out = doJmpNegOrZero);
+    Or(a = doJmpNegOrZero, b = doJmpPos, out = doJmp);
+    And(a = doJmp, b = instruction[15], out = loadPC);
+    PC(in = outA, load = loadPC, inc = true, reset = reset, out[0..14] = pc);
+
+    /** 
+     * ALU
+     * 
+     * if (a == 0)
+     *   y = A
+     * else
+     *   y = M
+     * 
+     * Note that :
+     * - instruction[12] == 0 means a == 0
+     */
+    Mux16(a = outA, b = inM, sel = instruction[12], out = outAOrInM); 
+    ALU(
+      x = outD,
+      y = outAOrInM,
+      zx = instruction[11],
+      nx = instruction[10],
+      zy = instruction[9],
+      ny = instruction[8],
+      f = instruction[7],
+      no = instruction[6],
+      out = outM,
+      out = outM0,
+      zr = outMIsZero,
+      ng = outMIsNeg
+    );
 }
