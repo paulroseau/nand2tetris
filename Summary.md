@@ -100,8 +100,8 @@
   * 1 Memory where data and instructions are stored
 
 - The Harvard architecture is a variation of the Von Neuman architecture.
-  Instead of multiplexing wheter we are reading instruction or data in from of
-  the memory, there are actually 2 different memory unit :
+  Instead of multiplexing whether we are reading instruction or data from
+  the memory, there are actually 2 different memory units :
   * ROM (Read-Only Memory) that stores instructions
   * RAM (Random Access Memory) that stores data
 
@@ -156,16 +156,50 @@
 
 - Notice that the whole Computer is a closed circuit. That is the output of some
   DFF are the input of other ones.
-  At each "tick" of the clock, inputs become outputs : 
-  * the PC outputs a new instruction address IAddr1.
-  * the addressM outputs a new data address DAddr1.
-  * the RAM and ROM output the data and instructions previously
-    selected, Data1 and Instr1.
-  At each "tock" of the clock, we have reached equilibrium :
-  * IAddr1 and DAddr1 flow to the ROM and RAM which "preselect" Instr2 and
-    Data2 (ie. Instr2 and Data2 are inputs to corresponding D-Flip-Flops). 
-  * Data1 and Instr1 have flown through the CPU which is ready to output IAddr2
-    and DAddr2.
+  * At each "tick" of the clock (instants "N+" in the hardware simulator),
+    inputs of registers in the CPU are set everywhere but are not output yet :
+    we are in a state of electrical equilibrium.
+  * At each "tock" of the clock (instants "N"), each registers in the CPU
+    actually outputs its input value. InstructionAddress and DataAddress change
+    and affect the ROM and RAM immediately, at least in the simulator.
+
+- Even though we have an Harvard architecture, we still have 2 cycles.
+  These two cylces are executed sequentially.
+
+- Illustration (as we see things in the Hardware simulator for chip Computer.hdl) :
+
+  time  state ROM    input PC   state PC   input ROM (output PC)
+            0           0           0              0
+  tick      0           0          @10             0             (execute)
+  tock     @10         @10         @10            @10            (fetch)
+  tick     @10         @10         @11            @10            (execute)
+  tock     @11         @11         @11            @11            (fetch)
+  tick     @11         @11         @24            @11            (execute)
+  tock     @24         @24         @24            @24            (fetch)
+  ...
+
+  Notice that with in this simplified representation : input ROM = state ROM = input PC 
+  In the hardware simulator we We skip the cycle where the ROM state is updated.
+
+- Detailed illustration :
+
+  time  state ROM   input PC   state PC   input ROM (output PC)
+            0          0           0              0
+  tick      0          0          @10             0              (execute - start)
+  tock      0          0          @10            @10             (execute - end)
+  tick     @10         0          @10            @10             (fetch - start)
+  tock     @10        @10         @10            @10             (fetch - end)
+  tick     @10        @10         @11            @10             (execute - start)
+  tock     @10        @10         @11            @11             (execute - end)
+  tick     @11        @10         @11            @11             (fetch - start)
+  tock     @11        @11         @11            @11             (fetch - end)
+  tick     @11        @11         @24            @11             (execute - start)
+  tock     @11        @11         @24            @24             (execute - end)
+  tick     @24        @11         @24            @24             (fetch - start)
+  tock     @24        @24         @24            @24             (fetch - end)
+  ...
+
+  Here we have detailed the update cycle of the ROM (the fetch cycle)
 
 - A computer (ie. CPU + Memory) can be represented theortically by a finite state machine,
   from which we can easily derive a physical implementations. Transitions are
