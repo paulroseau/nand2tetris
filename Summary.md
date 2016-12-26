@@ -179,7 +179,7 @@
   ...
 
   Notice that with in this simplified representation : input ROM = state ROM = input PC 
-  In the hardware simulator we We skip the cycle where the ROM state is updated.
+  In the hardware simulator we skip the cycle where the ROM state is updated.
 
 - Detailed illustration :
 
@@ -199,7 +199,80 @@
   tock     @24        @24         @24            @24             (fetch - end)
   ...
 
-  Here we have detailed the update cycle of the ROM (the fetch cycle)
+  Here we have detailed the update cycle of the ROM (the fetch cycle). 
+
+  Here I have assumed that as long as the input PC does not change, the state of
+  PC doesn't change as well. However in theory, after one clock cycle the PC is
+  incremented by one. So the above is wrong... but this is the behaviour
+  observed from the hardware simulator.
+
+- Explanation after reading : http://labs.domipheus.com/blog/tpu-series-quick-links/
+  * In part 3 and 4 : 
+    - Definitions of the instruction decoder and of the ALU. What the decoder
+      does is basically forwarding its inputs to the ALU, doing some grouping
+      and splitting to match ALU inputs. This corresponds to the operation of
+      sending the 'c' control bits on the CPU_schema picture. Here it has been
+      properly isolated as a chip itself so the CPU looks like a chip pipeline
+      starting with the sequence : Decoder -> ALU -> ...
+    - Both of these chips have an enable pin which needs to be set at '1' if
+      there are to output what is expected (there must be a multiplexer at first
+      taking the enable pin as one of its input).
+    - Both of these chips are clocked. This means that their state change at the
+      rising edge of the clock (it could be the falling edge, but in the tpu
+      series, the vhdl source code features rising edge).
+      Remember that the clock is a simple square signal ('1' for half of the
+      cycle, '0' for the other half). The physical implementation of rising edge
+      change is done via D Flip-Flops (connected to the clock) of which inner
+      state and (delayed) output change at the rising edge of the clock. The
+      mere use of DFF in your chip will make it clocked.
+      Check the corresponding electronic circuit on wikipedia at (paragraph
+      "Classical positive-edge-triggered D flip-flop"): 
+      https://en.wikipedia.org/wiki/Flip-flop_(electronics)
+      NB : You can implement a rising edge detector on a lower frequency than
+      the one of  the clock with that kind of circuit : 
+      http://fpgacenter.com/examples/basic/edge_detector.php
+  * In part 5 :
+    - The above chips are wired (along with a third one, always enabled and
+      clocked, that performs write back to memory). Then a test script is played
+      (both Decoder and ALU enable pin are enabled all the time, check the 'en'
+      signal below the 'clock' signal). As chips are piped we notice that we
+      need to wait for 2 clock cycles in order to reach a stable state, 3 when
+      we are writing back the result to the same register from which we are
+      reading.
+    - Since adding wait cycles is not a tractable approach if we want to chain
+      operations : we would need to add the right amount of wait cycles between
+      each operation. Thus we add a control unit of which output is a bitmask
+      (0010 for example) corresponding to the currently active state in the
+      pipeline, as well as a reset and clock input. At each rising edge of the
+      clock the bitmask changes to the next state. Each bit is connected to the
+      enable pin of one chip in the pipeline. Thus each chip is activated
+      alternatively.
+  * In part 6 :
+    - Definition of the PC in a very similar fashion to what is done in
+      nand2tetris. However, here it is pointed out, that when assigning the PC
+      to some address, we need to wait for the termination of the ALU stage.
+      Thus the input of the PC is for some given stages NOP (ie. halt - don't do
+      anything) and for some others it is either reset, incremented, or set to
+      some arbitrary value. 
+  
+  It is key to notice here that the control unit lets us implement a proper
+  finite state machine, that lets information propagate synchronously at the
+  cost of adding some delay cycles. This is not so clear in the CPU_schema (for
+  which the implementation is actually wrong, since the PC can get off sync when
+  assigned to a specific address rather than just being incremented).
+
+  NB : In part 10 of the series, interrupts are tackled. The way they are
+  implemented in the hardware consists basically in adding an extra stage in the
+  control unit for handling an interrupt. To get into this stage the
+  interrupt input must be enabled. What this stage does is :
+   - acknowledging the interrupt, emiting a '1' on the interrupt output pin
+   - saving the current PC to some register for later
+   - disabling the interrupt for the time this one gets handled
+   - setting the PC to the handler
+  During this time the external device (upon reception of the interrupt ACK,
+  sends the data to be processed). You can get a rough idea of what is going on
+  here :
+  https://github.com/Domipheus/TPU/blob/master/vhdl/core/control_unit.vhd#L128
 
 - A computer (ie. CPU + Memory) can be represented theortically by a finite state machine,
   from which we can easily derive a physical implementations. Transitions are
